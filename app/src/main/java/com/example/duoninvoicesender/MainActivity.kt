@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.provider.MediaStore
 import android.view.Gravity
 import android.widget.Button
@@ -14,15 +15,22 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.FileProvider
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
+
 
 class MainActivity : AppCompatActivity() {
 
     private val picId = 123
-    private lateinit var photo: Bitmap
     private val requestCamera: Int = 2
     private val requestWrite: Int = 2
-    var photoTaken = false
+    var mCurrentPhotoPath: String? = null
+    var photoFile: File? = null
+    var photoURI: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,13 +46,18 @@ class MainActivity : AppCompatActivity() {
         val buttonShot: Button = findViewById<Button>(R.id.buttonShot)
         buttonShot?.setOnClickListener(){
             val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            startActivityForResult(cameraIntent, picId)
+            photoFile = createImageFile()
+            if (photoFile != null) {
+                photoURI = FileProvider.getUriForFile(this, "com.example.duoninvoicesender.fileprovider", photoFile!!)
+                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                startActivityForResult(cameraIntent, picId)
+            }
         }
 
         val buttonSend: Button = findViewById<Button>(R.id.buttonSend)
         buttonSend?.setOnClickListener(){
-            if (photoTaken) {
-                sendEmail("faktury@duon.pl" as String, "Faktura" as String, photo as Bitmap)
+            if (photoURI != null) {
+                sendEmail("adaltekos@gmail.com" as String, "Faktura" as String, photoURI as Uri)
             }
             else{
                 val toast = Toast.makeText(applicationContext, "Take photo first", Toast.LENGTH_SHORT)
@@ -54,33 +67,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendEmail(mail: String, title: String, photo: Bitmap) {
+    private fun sendEmail(mail: String, title: String, image: Uri) {
         val mailIntent = Intent(Intent.ACTION_SEND)
         mailIntent.data = Uri.parse("mailto:")
         mailIntent.type = "message/rfc822"
         val addressees = arrayOf(mail)
-        val photoUri = getImageUriFromBitmap(applicationContext, photo) as Uri
         mailIntent.putExtra(Intent.EXTRA_EMAIL, addressees)
         mailIntent.putExtra(Intent.EXTRA_SUBJECT, title)
-        mailIntent.putExtra(Intent.EXTRA_STREAM, photoUri)
+        mailIntent.putExtra(Intent.EXTRA_STREAM, image)
         startActivity(Intent.createChooser(mailIntent, "Wybierz klienta poczty..."))
     }
 
-    private fun getImageUriFromBitmap(context: Context, bitmap: Bitmap): Uri{
-        val bytes = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes)
-        val path = MediaStore.Images.Media.insertImage(context.contentResolver, bitmap, "Title", null)!! as String
-        return Uri.parse(path)
+    override fun onActivityResult(requestCode: Int, resultCode: Int, dane: Intent?
+    ) {
+        super.onActivityResult(requestCode, resultCode, dane)
+        if (requestCode == picId && resultCode == RESULT_OK && dane!= null) {
+            val file = File(mCurrentPhotoPath)
+            val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, Uri.fromFile(file))
+            val imageViewCamera: ImageView = findViewById<ImageView>(R.id.imageViewCamera)
+            imageViewCamera.setImageBitmap(bitmap)
+        }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?
-    ) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == picId && resultCode == RESULT_OK && data!= null) {
-            photo = data.extras?.get("data") as Bitmap
-            photoTaken = true
-            val imageViewCamera: ImageView = findViewById<ImageView>(R.id.imageViewCamera)
-            imageViewCamera.setImageBitmap(photo)
-        }
+    @Throws(IOException::class)
+    private fun createImageFile(): File? {
+        // Create an image file name
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val imageFileName = "JPEG_" + timeStamp + "_"
+        val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        val image = File.createTempFile(
+            imageFileName,  /* prefix */
+            ".jpg",  /* suffix */
+            storageDir /* directory */
+        )
+        mCurrentPhotoPath = image.absolutePath
+        return image
     }
 }
