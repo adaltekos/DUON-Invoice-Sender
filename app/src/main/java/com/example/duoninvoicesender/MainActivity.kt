@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         buttonSend?.setOnClickListener(){
             if (photoURI != null) {
                 sendEmail("adaltekos@gmail.com" as String, "Faktura" as String, photoURI as Uri)
+                println("dfdfd")
             }
             else{
                 val toast = Toast.makeText(applicationContext, "Take photo first", Toast.LENGTH_SHORT)
