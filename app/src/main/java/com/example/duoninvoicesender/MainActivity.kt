@@ -29,7 +29,6 @@ class MainActivity : AppCompatActivity() {
     private val picId = 123
     private val requestCamera: Int = 2
     private val requestWrite: Int = 2
-    var mCurrentPhotoPath: String? = null
     var photoFile: File? = null
     var photoURI: Uri? = null
 
@@ -44,28 +43,12 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),requestWrite)
         }
 
-        val buttonShot: Button = findViewById<Button>(R.id.buttonShot)
-        buttonShot?.setOnClickListener(){
-            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            photoFile = createImageFile()
-            if (photoFile != null) {
-                photoURI = FileProvider.getUriForFile(this, "com.example.duoninvoicesender.fileprovider", photoFile!!)
-                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
-                startActivityForResult(cameraIntent, picId)
-            }
-        }
-
-        val buttonSend: Button = findViewById<Button>(R.id.buttonSend)
-        buttonSend?.setOnClickListener(){
-            if (photoURI != null) {
-                sendEmail("adaltekos@gmail.com" as String, "Faktura" as String, photoURI as Uri)
-                println("dfdfd")
-            }
-            else{
-                val toast = Toast.makeText(applicationContext, "Take photo first", Toast.LENGTH_SHORT)
-                toast.setGravity(Gravity.BOTTOM,0,200)
-                toast.show()
-            }
+        val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        photoFile = createImageFile()
+        if (photoFile != null) {
+            photoURI = FileProvider.getUriForFile(this, "com.example.duoninvoicesender.fileprovider", photoFile!!)
+            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+            startActivityForResult(cameraIntent, picId)
         }
     }
 
@@ -77,17 +60,21 @@ class MainActivity : AppCompatActivity() {
         mailIntent.putExtra(Intent.EXTRA_EMAIL, addressees)
         mailIntent.putExtra(Intent.EXTRA_SUBJECT, title)
         mailIntent.putExtra(Intent.EXTRA_STREAM, image)
-        startActivity(Intent.createChooser(mailIntent, "Wybierz klienta poczty..."))
+        startActivity(mailIntent)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, dane: Intent?
     ) {
         super.onActivityResult(requestCode, resultCode, dane)
         if (requestCode == picId && resultCode == RESULT_OK && dane!= null) {
-            val file = File(mCurrentPhotoPath)
-            val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, Uri.fromFile(file))
-            val imageViewCamera: ImageView = findViewById<ImageView>(R.id.imageViewCamera)
-            imageViewCamera.setImageURI(photoURI)
+            if (photoURI != null) {
+                sendEmail("adaltekos@gmail.com" as String, "Faktura" as String, photoURI as Uri)
+            }
+            else{
+                val toast = Toast.makeText(applicationContext, "Take photo first", Toast.LENGTH_SHORT)
+                toast.setGravity(Gravity.BOTTOM,0,200)
+                toast.show()
+            }
         }
     }
 
@@ -102,7 +89,6 @@ class MainActivity : AppCompatActivity() {
             ".jpg",  /* suffix */
             storageDir /* directory */
         )
-        mCurrentPhotoPath = image.absolutePath
         return image
     }
 }
