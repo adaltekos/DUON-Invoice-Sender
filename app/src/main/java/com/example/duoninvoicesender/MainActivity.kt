@@ -1,6 +1,7 @@
 package com.example.duoninvoicesender
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -85,13 +86,13 @@ class MainActivity : AppCompatActivity() {
             val file = File(mCurrentPhotoPath)
             val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, Uri.fromFile(file))
             val imageViewCamera: ImageView = findViewById<ImageView>(R.id.imageViewCamera)
-            imageViewCamera.setImageBitmap(bitmap)
+            imageViewCamera.setImageURI(photoURI)
         }
     }
 
+    @SuppressLint("SimpleDateFormat")
     @Throws(IOException::class)
     private fun createImageFile(): File? {
-        // Create an image file name
         val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
         val imageFileName = "JPEG_" + timeStamp + "_"
         val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
