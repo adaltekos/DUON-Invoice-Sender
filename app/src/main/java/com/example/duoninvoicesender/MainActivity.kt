@@ -36,9 +36,6 @@ import javax.mail.internet.MimeMultipart
 class MainActivity : AppCompatActivity() {
 
     private val picId = 123
-    private val requestCamera: Int = 2
-    private val requestWrite: Int = 2
-    private val requestInternet: Int = 2
     var photoFile: File? = null
     var photoURI: Uri? = null
     lateinit var mCurrentPhotoPath : String
@@ -52,48 +49,51 @@ class MainActivity : AppCompatActivity() {
     var mailPassString : String = ""
     var firstLetterOfName: Char? = null
     var firstLetterOfSurname: Char? = null
+    private val PERMISSION_ALL = 1
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA),requestCamera)
-        }
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),requestWrite)
-        }
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.INTERNET),requestInternet)
+
+        val PERMISSIONS = arrayOf(
+            Manifest.permission.INTERNET,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA
+        )
+
+        if (!hasPermissions(this, *PERMISSIONS)) {
+            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL)
         }
 
         loadData()
-        firstLetterOfName = mailFromMailString.get(0).toUpperCase()
-        firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
+        if(mailFromMailString != "")firstLetterOfName = mailFromMailString.get(0).toUpperCase()
+        if(mailFromMailString != "")firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
 
-        val mailFromMailEditText  = findViewById(R.id.mailFromEditTextEmailAddress) as EditText
+        val mailFromMailEditText  = findViewById<EditText>(R.id.mailFromEditTextEmailAddress)
         mailFromMailEditText.setText(mailFromMailString)
-        val mailFromPassEditText  = findViewById(R.id.mailFromEditTextPassword) as EditText
+        val mailFromPassEditText  = findViewById<EditText>(R.id.mailFromEditTextPassword)
         mailFromPassEditText.setText(mailPassString)
-        val testMailButton = findViewById(R.id.testMailButton) as Button
+        val testMailButton = findViewById<Button>(R.id.testMailButton)
         testMailButton.setOnClickListener {
             mailFromMailString = mailFromMailEditText.text.toString()
             saveData(TEXTMailFrom, mailFromMailString)
             mailPassString = mailFromPassEditText.text.toString()
             saveData(TEXTMailPass, mailPassString)
-            Thread({Transport.send(testMail())}).start()
-            val toast = Toast.makeText(applicationContext, "Saved and test mail sent", Toast.LENGTH_SHORT)
-            toast.setGravity(Gravity.BOTTOM,0,200)
-            toast.show()
+            if(mailFromMailString != "")firstLetterOfName = mailFromMailString.get(0).toUpperCase()
+            if(mailFromMailString != "")firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
+            Thread({testMail()}).start()
         }
 
-        val takePhotoButton = findViewById(R.id.takePhotoButton) as Button
+        val takePhotoButton = findViewById<Button>(R.id.takePhotoButton)
         takePhotoButton.setOnClickListener {
             startCameraIntent()
         }
 
-        startCameraIntent()
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startCameraIntent()
+        }
 
     }
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     fun showDialogMailTo() {
         val dialogMailTo = Dialog(this)
         dialogMailTo.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialogMailTo.setCancelable(true)
+        dialogMailTo.setCancelable(false)
         dialogMailTo.setContentView(R.layout.mail_to)
         val phoneField  = dialogMailTo.findViewById(R.id.mailToEditTextEmailAddress) as EditText
         phoneField.setText(mailTo)
@@ -197,7 +197,7 @@ class MainActivity : AppCompatActivity() {
             override fun getPasswordAuthentication() =
                 PasswordAuthentication(from, mailPassString) //Credentials of the sender email
         }
-        val session = Session.getDefaultInstance(properties, auth)
+        val session = Session.getInstance(properties, auth)
         val message = MimeMessage(session)
         val multipart = MimeMultipart("related")
         val messageBodyPart1 = MimeBodyPart()
@@ -221,31 +221,46 @@ class MainActivity : AppCompatActivity() {
         return message
     }
 
-    private fun testMail(): MimeMessage {
-        val tos = arrayListOf(mailFromMailString) //Multiple recipients
-        val from = mailFromMailString //Sender email
-        val properties = System.getProperties()
-        with (properties) {
-            put("mail.smtp.host", "mail.duon.biz") //Configure smtp host
-            put("mail.smtp.port", "587") //Configure port
-            //put("mail.smtp.starttls.enable", "false") //Enable TLS
-            put("mail.smtp.auth", "true") //Enable authentication
-        }
-        val auth = object: Authenticator() {
-            override fun getPasswordAuthentication() =
-                PasswordAuthentication(from, mailPassString) //Credentials of the sender email
-        }
-        val session = Session.getDefaultInstance(properties, auth)
-        val message = MimeMessage(session)
-        with (message) {
-            setFrom(InternetAddress(from))
-            for (to in tos) {
-                addRecipient(Message.RecipientType.TO, InternetAddress(to))
-                subject = "Test mail" //Email subject
-                setText("To jest wiadomość testowa z aplikacji DUON Invoice Sender")
+    private fun testMail() {
+        try {
+            val properties = System.getProperties()
+            with(properties) {
+                //put("mail.smtp.host", "mail.duon.biz") //Configure smtp host
+                //put("mail.smtp.port", "587") //Configure port
+                //put("mail.smtp.starttls.enable", "false") //Enable TLS
+                put("mail.smtp.auth", "true") //Enable authentication
+            }
+            val session = Session.getInstance(properties, null)
+            val transport = session.getTransport("smtp")
+            transport.connect("mail.duon.biz", 587, mailFromMailString, mailPassString)
+            transport.close()
+            this@MainActivity.runOnUiThread {
+                val toast = Toast.makeText(this@MainActivity, "Saved and mail test passed", Toast.LENGTH_SHORT)
+                toast.setGravity(Gravity.BOTTOM,0,200)
+                toast.show()
             }
         }
-        return message
+        catch(e: AuthenticationFailedException) {
+            e.printStackTrace()
+            this@MainActivity.runOnUiThread {
+                val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                toast.setGravity(Gravity.BOTTOM,0,200)
+                toast.show()
+            }
+
+        }
+        catch(e: MessagingException) {
+            e.printStackTrace()
+            this@MainActivity.runOnUiThread {
+                val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                toast.setGravity(Gravity.BOTTOM,0,200)
+                toast.show()
+            }
+        }
+    }
+
+    private fun hasPermissions(context: Context, vararg permissions: String): Boolean = permissions.all {
+        ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
 
 }
