@@ -160,10 +160,14 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onActivityResult(requestCode, resultCode, dane)
         if (requestCode == picId && resultCode == RESULT_OK && dane!= null) {
-            Thread({Transport.send(plainMail())}).start()
-            val toast = Toast.makeText(applicationContext, "Mail sent", Toast.LENGTH_SHORT)
-            toast.setGravity(Gravity.BOTTOM,0,200)
-            toast.show()
+            Thread {
+                Transport.send(plainMail())
+                this@MainActivity.runOnUiThread {
+                    val toast = Toast.makeText(this@MainActivity, "Mail sent", Toast.LENGTH_SHORT)
+                    toast.setGravity(Gravity.BOTTOM, 0, 200)
+                    toast.show()
+                }
+            }.start()
         }
     }
 
@@ -184,38 +188,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun plainMail(): MimeMessage {
-        val tos = arrayListOf(mailTo) //Multiple recipients
-        val from = mailFromMailString //Sender email
-        val properties = System.getProperties()
-        with (properties) {
-            put("mail.smtp.host", "mail.duon.biz") //Configure smtp host
-            put("mail.smtp.port", "587") //Configure port
-            //put("mail.smtp.starttls.enable", "false") //Enable TLS
-            put("mail.smtp.auth", "true") //Enable authentication
+
+            val tos = arrayListOf(mailTo) //Multiple recipients
+            val from = mailFromMailString //Sender email
+            val properties = System.getProperties()
+            with(properties) {
+                put("mail.smtp.host", "mail.duon.biz") //Configure smtp host
+                put("mail.smtp.port", "587") //Configure port
+                //put("mail.smtp.starttls.enable", "false") //Enable TLS
+                put("mail.smtp.auth", "true") //Enable authentication
+            }
+            val auth = object : Authenticator() {
+                override fun getPasswordAuthentication() =
+                    PasswordAuthentication(from, mailPassString) //Credentials of the sender email
+            }
+            val session = Session.getInstance(properties, auth)
+            val message = MimeMessage(session)
+        try {
+            val multipart = MimeMultipart("related")
+            val messageBodyPart1 = MimeBodyPart()
+            val Text = "W załączeniu skan faktury. - " + firstLetterOfName.toString() + firstLetterOfSurname.toString()
+            messageBodyPart1.setContent(Text, "text/html; charset=UTF-8")
+            multipart.addBodyPart(messageBodyPart1)
+            val messageBodyPart2 = MimeBodyPart()
+            val fds = FileDataSource(mCurrentPhotoPath)
+            messageBodyPart2.dataHandler = DataHandler(fds)
+            messageBodyPart2.fileName = mCurrentPhotoName
+            multipart.addBodyPart(messageBodyPart2)
+            with(message) {
+                setFrom(InternetAddress(from))
+                for (to in tos) {
+                    addRecipient(Message.RecipientType.TO, InternetAddress(to))
+                    subject = "Skan_Faktury" //Email subject
+                    setContent(multipart)
+                }
+            }
         }
-        val auth = object: Authenticator() {
-            override fun getPasswordAuthentication() =
-                PasswordAuthentication(from, mailPassString) //Credentials of the sender email
+        catch(e: AuthenticationFailedException) {
+            e.printStackTrace()
+            this@MainActivity.runOnUiThread {
+                val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                toast.setGravity(Gravity.BOTTOM,0,200)
+                toast.show()
+            }
         }
-        val session = Session.getInstance(properties, auth)
-        val message = MimeMessage(session)
-        val multipart = MimeMultipart("related")
-        val messageBodyPart1 = MimeBodyPart()
-        val Text = "W załączeniu skan faktury. - " + firstLetterOfName.toString() + firstLetterOfSurname.toString()
-        //charset("UTF-8")
-        messageBodyPart1.setContent(Text, "text/html; charset=UTF-8")
-        multipart.addBodyPart(messageBodyPart1)
-        val messageBodyPart2 = MimeBodyPart()
-        val fds = FileDataSource(mCurrentPhotoPath)
-        messageBodyPart2.dataHandler = DataHandler(fds)
-        messageBodyPart2.fileName = mCurrentPhotoName
-        multipart.addBodyPart(messageBodyPart2)
-        with (message) {
-            setFrom(InternetAddress(from))
-            for (to in tos) {
-                addRecipient(Message.RecipientType.TO, InternetAddress(to))
-                subject = "Skan_Faktury" //Email subject
-                setContent(multipart)
+        catch(e: MessagingException) {
+            e.printStackTrace()
+            this@MainActivity.runOnUiThread {
+                val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                toast.setGravity(Gravity.BOTTOM,0,200)
+                toast.show()
             }
         }
         return message
