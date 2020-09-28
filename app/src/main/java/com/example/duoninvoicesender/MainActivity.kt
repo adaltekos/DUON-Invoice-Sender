@@ -159,7 +159,7 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, dane: Intent?
     ) {
         super.onActivityResult(requestCode, resultCode, dane)
-        if (requestCode == picId && resultCode == RESULT_OK && dane!= null) {
+        if (requestCode == picId && resultCode == RESULT_OK) {
             Thread {
                 Transport.send(plainMail())
                 this@MainActivity.runOnUiThread {
