@@ -71,8 +71,7 @@ class MainActivity : AppCompatActivity() {
         loadData()
         firstLetterOfName = mailFromMailString.get(0).toUpperCase()
         firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
-        println(firstLetterOfName!!)
-        println(firstLetterOfSurname!!)
+
         val mailFromMailEditText  = findViewById(R.id.mailFromEditTextEmailAddress) as EditText
         mailFromMailEditText.setText(mailFromMailString)
         val mailFromPassEditText  = findViewById(R.id.mailFromEditTextPassword) as EditText
@@ -84,6 +83,9 @@ class MainActivity : AppCompatActivity() {
             mailPassString = mailFromPassEditText.text.toString()
             saveData(TEXTMailPass, mailPassString)
             Thread({Transport.send(testMail())}).start()
+            val toast = Toast.makeText(applicationContext, "Saved and test mail sent", Toast.LENGTH_SHORT)
+            toast.setGravity(Gravity.BOTTOM,0,200)
+            toast.show()
         }
 
         val takePhotoButton = findViewById(R.id.takePhotoButton) as Button
@@ -114,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     fun showDialogMailTo() {
         val dialogMailTo = Dialog(this)
         dialogMailTo.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialogMailTo.setCancelable(false)
+        dialogMailTo.setCancelable(true)
         dialogMailTo.setContentView(R.layout.mail_to)
         val phoneField  = dialogMailTo.findViewById(R.id.mailToEditTextEmailAddress) as EditText
         phoneField.setText(mailTo)
@@ -123,6 +125,9 @@ class MainActivity : AppCompatActivity() {
             mailTo = phoneField.text.toString()
             saveData(TEXTMailTo, mailTo)
             dialogMailTo.dismiss()
+            val toast = Toast.makeText(applicationContext, "Saved", Toast.LENGTH_SHORT)
+            toast.setGravity(Gravity.BOTTOM,0,200)
+            toast.show()
         }
         dialogMailTo.show()
     }
@@ -155,14 +160,10 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onActivityResult(requestCode, resultCode, dane)
         if (requestCode == picId && resultCode == RESULT_OK && dane!= null) {
-            if (photoURI != null) {
-                Thread({Transport.send(plainMail())}).start()
-            }
-            else{
-                val toast = Toast.makeText(applicationContext, "Take photo first", Toast.LENGTH_SHORT)
-                toast.setGravity(Gravity.BOTTOM,0,200)
-                toast.show()
-            }
+            Thread({Transport.send(plainMail())}).start()
+            val toast = Toast.makeText(applicationContext, "Mail sent", Toast.LENGTH_SHORT)
+            toast.setGravity(Gravity.BOTTOM,0,200)
+            toast.show()
         }
     }
 
@@ -201,7 +202,8 @@ class MainActivity : AppCompatActivity() {
         val multipart = MimeMultipart("related")
         val messageBodyPart1 = MimeBodyPart()
         val Text = "W załączeniu skan faktury. - " + firstLetterOfName.toString() + firstLetterOfSurname.toString()
-        messageBodyPart1.setContent(Text, "text/html")
+        //charset("UTF-8")
+        messageBodyPart1.setContent(Text, "text/html; charset=UTF-8")
         multipart.addBodyPart(messageBodyPart1)
         val messageBodyPart2 = MimeBodyPart()
         val fds = FileDataSource(mCurrentPhotoPath)
@@ -218,6 +220,7 @@ class MainActivity : AppCompatActivity() {
         }
         return message
     }
+
     private fun testMail(): MimeMessage {
         val tos = arrayListOf(mailFromMailString) //Multiple recipients
         val from = mailFromMailString //Sender email
@@ -240,7 +243,6 @@ class MainActivity : AppCompatActivity() {
                 addRecipient(Message.RecipientType.TO, InternetAddress(to))
                 subject = "Test mail" //Email subject
                 setText("To jest wiadomość testowa z aplikacji DUON Invoice Sender")
-
             }
         }
         return message
