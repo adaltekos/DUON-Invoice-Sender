@@ -161,11 +161,37 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, dane)
         if (requestCode == picId && resultCode == RESULT_OK) {
             Thread {
-                Transport.send(plainMail())
-                this@MainActivity.runOnUiThread {
-                    val toast = Toast.makeText(this@MainActivity, "Mail sent", Toast.LENGTH_SHORT)
-                    toast.setGravity(Gravity.BOTTOM, 0, 200)
-                    toast.show()
+                try {
+                    Transport.send(plainMail())
+                    this@MainActivity.runOnUiThread {
+                        val toast = Toast.makeText(this@MainActivity, "Mail sent", Toast.LENGTH_SHORT)
+                        toast.setGravity(Gravity.BOTTOM, 0, 200)
+                        toast.show()
+                    }
+                }
+                catch(e: AuthenticationFailedException) {
+                    e.printStackTrace()
+                    this@MainActivity.runOnUiThread {
+                        val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                        toast.setGravity(Gravity.BOTTOM,0,200)
+                        toast.show()
+                    }
+                }
+                catch(e: SendFailedException) {
+                    e.printStackTrace()
+                    this@MainActivity.runOnUiThread {
+                        val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                        toast.setGravity(Gravity.BOTTOM, 0, 200)
+                        toast.show()
+                    }
+                }
+                catch(e: MessagingException) {
+                    e.printStackTrace()
+                    this@MainActivity.runOnUiThread {
+                        val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
+                        toast.setGravity(Gravity.BOTTOM,0,200)
+                        toast.show()
+                    }
                 }
             }.start()
         }
@@ -204,7 +230,6 @@ class MainActivity : AppCompatActivity() {
             }
             val session = Session.getInstance(properties, auth)
             val message = MimeMessage(session)
-        try {
             val multipart = MimeMultipart("related")
             val messageBodyPart1 = MimeBodyPart()
             val Text = "W załączeniu skan faktury. - " + firstLetterOfName.toString() + firstLetterOfSurname.toString()
@@ -223,23 +248,6 @@ class MainActivity : AppCompatActivity() {
                     setContent(multipart)
                 }
             }
-        }
-        catch(e: AuthenticationFailedException) {
-            e.printStackTrace()
-            this@MainActivity.runOnUiThread {
-                val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
-                toast.setGravity(Gravity.BOTTOM,0,200)
-                toast.show()
-            }
-        }
-        catch(e: MessagingException) {
-            e.printStackTrace()
-            this@MainActivity.runOnUiThread {
-                val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
-                toast.setGravity(Gravity.BOTTOM,0,200)
-                toast.show()
-            }
-        }
         return message
     }
 
