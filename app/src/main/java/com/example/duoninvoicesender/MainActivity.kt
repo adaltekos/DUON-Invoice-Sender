@@ -10,16 +10,12 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import android.view.Gravity
-import android.view.Menu
-import android.view.MenuItem
-import android.view.Window
-import android.widget.Button
-import android.widget.EditText
-import android.widget.Toast
+import android.view.*
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
+import org.w3c.dom.Text
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -50,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     var firstLetterOfName: Char? = null
     var firstLetterOfSurname: Char? = null
     private val PERMISSION_ALL = 1
+    lateinit var log: ProgressBar
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadData()
+        log =findViewById(R.id.progressBar)
         if(mailFromMailString != "")firstLetterOfName = mailFromMailString.get(0).toUpperCase()
         if(mailFromMailString != "")firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
 
@@ -160,10 +158,12 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onActivityResult(requestCode, resultCode, dane)
         if (requestCode == picId && resultCode == RESULT_OK) {
-            Thread {
+            log.visibility = View.VISIBLE
+            val sendThread = Thread {
                 try {
                     Transport.send(plainMail())
                     this@MainActivity.runOnUiThread {
+                        log.visibility = View.INVISIBLE
                         val toast = Toast.makeText(this@MainActivity, "Mail sent", Toast.LENGTH_SHORT)
                         toast.setGravity(Gravity.BOTTOM, 0, 200)
                         toast.show()
@@ -193,7 +193,9 @@ class MainActivity : AppCompatActivity() {
                         toast.show()
                     }
                 }
-            }.start()
+            }
+            sendThread.priority = 10
+            sendThread.start()
         }
     }
 
@@ -214,7 +216,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun plainMail(): MimeMessage {
-
             val tos = arrayListOf(mailTo) //Multiple recipients
             val from = mailFromMailString //Sender email
             val properties = System.getProperties()
