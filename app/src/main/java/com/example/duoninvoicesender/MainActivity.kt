@@ -172,6 +172,7 @@ class MainActivity : AppCompatActivity() {
                 catch(e: AuthenticationFailedException) {
                     e.printStackTrace()
                     this@MainActivity.runOnUiThread {
+                        log.visibility = View.INVISIBLE
                         val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
                         toast.setGravity(Gravity.BOTTOM,0,200)
                         toast.show()
@@ -180,6 +181,7 @@ class MainActivity : AppCompatActivity() {
                 catch(e: SendFailedException) {
                     e.printStackTrace()
                     this@MainActivity.runOnUiThread {
+                        log.visibility = View.INVISIBLE
                         val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
                         toast.setGravity(Gravity.BOTTOM, 0, 200)
                         toast.show()
@@ -188,6 +190,7 @@ class MainActivity : AppCompatActivity() {
                 catch(e: MessagingException) {
                     e.printStackTrace()
                     this@MainActivity.runOnUiThread {
+                        log.visibility = View.INVISIBLE
                         val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
                         toast.setGravity(Gravity.BOTTOM,0,200)
                         toast.show()
