@@ -15,7 +15,6 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.FileProvider
-import org.w3c.dom.Text
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -223,9 +222,9 @@ class MainActivity : AppCompatActivity() {
             val from = mailFromMailString //Sender email
             val properties = System.getProperties()
             with(properties) {
-                put("mail.smtp.host", "mail.duon.biz") //Configure smtp host
+                put("mail.smtp.host", "smtp.office365.com") //Configure smtp host
                 put("mail.smtp.port", "587") //Configure port
-                //put("mail.smtp.starttls.enable", "false") //Enable TLS
+                put("mail.smtp.starttls.enable", "true") //Enable TLS
                 put("mail.smtp.auth", "true") //Enable authentication
             }
             val auth = object : Authenticator() {
@@ -266,7 +265,7 @@ class MainActivity : AppCompatActivity() {
             }
             val session = Session.getInstance(properties, null)
             val transport = session.getTransport("smtp")
-            transport.connect("mail.duon.biz", 587, mailFromMailString, mailPassString)
+            transport.connect("smtp.office365.com", 587, mailFromMailString, mailPassString)
             transport.close()
             this@MainActivity.runOnUiThread {
                 val toast = Toast.makeText(this@MainActivity, "Saved and mail test passed", Toast.LENGTH_SHORT)
