@@ -2,11 +2,12 @@ package com.example.duoninvoicesender
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Dialog
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
@@ -14,7 +15,10 @@ import android.view.*
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
+import kotlinx.android.synthetic.main.payment_method.*
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -26,61 +30,47 @@ import javax.mail.internet.InternetAddress
 import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
+import android.app.NotificationManager
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 
+@ExperimentalStdlibApi
 class MainActivity : AppCompatActivity() {
 
-    private val picId = 123
-    var photoFile: File? = null
-    var photoURI: Uri? = null
-    lateinit var mCurrentPhotoPath : String
-    lateinit var mCurrentPhotoName : String
-    private val SHARED_PREFS = "sharedPrefs"
-    private val TEXTMailTo = "MailTo"
-    private val TEXTMailFrom = "MailFrom"
-    private val TEXTMailPass = "MailFromPass"
-    var mailTo: String = ""
-    var mailFromMailString : String = ""
-    var mailPassString : String = ""
-    var firstLetterOfName: Char? = null
-    var firstLetterOfSurname: Char? = null
-    private val PERMISSION_ALL = 1
-    lateinit var log: ProgressBar
+    private var photoFile: File? = null
+    private var photoURI: Uri? = null
+    private lateinit var mCurrentPhotoPath : String
+    private var mailTo: String = ""
+    private var mailFrom : String = ""
+    var mailPass : String = ""
+    private var firstName: String? = null
+    private var lastName: String? = null
+    private lateinit var progressBar: ProgressBar
+    private lateinit var radioButton: RadioButton
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-
-        val PERMISSIONS = arrayOf(
-            Manifest.permission.INTERNET,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.CAMERA
-        )
-
-        if (!hasPermissions(this, *PERMISSIONS)) {
-            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL)
-        }
-
+        setPermission()
         loadData()
-        log =findViewById(R.id.progressBar)
-        if(mailFromMailString != "")firstLetterOfName = mailFromMailString.get(0).toUpperCase()
-        if(mailFromMailString != "")firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
+        setNameAndSurname()
+        createNotificationChannel()
 
         val mailFromMailEditText  = findViewById<EditText>(R.id.mailFromEditTextEmailAddress)
-        mailFromMailEditText.setText(mailFromMailString)
+        mailFromMailEditText.setText(mailFrom)
         val mailFromPassEditText  = findViewById<EditText>(R.id.mailFromEditTextPassword)
-        mailFromPassEditText.setText(mailPassString)
+        mailFromPassEditText.setText(mailPass)
         val testMailButton = findViewById<Button>(R.id.testMailButton)
         testMailButton.setOnClickListener {
-            mailFromMailString = mailFromMailEditText.text.toString()
-            saveData(TEXTMailFrom, mailFromMailString)
-            mailPassString = mailFromPassEditText.text.toString()
-            saveData(TEXTMailPass, mailPassString)
-            if(mailFromMailString != "")firstLetterOfName = mailFromMailString.get(0).toUpperCase()
-            if(mailFromMailString != "")firstLetterOfSurname = mailFromMailString.get(mailFromMailString.indexOf(".")+1).toUpperCase()
-            Thread({testMail()}).start()
+            mailFrom = mailFromMailEditText.text.toString()
+            saveData("MailFrom", mailFrom)
+            mailPass = mailFromPassEditText.text.toString()
+            saveData("MailFromPass", mailPass)
+            setNameAndSurname()
+            Thread { testMail() }.start()
         }
 
         val takePhotoButton = findViewById<Button>(R.id.takePhotoButton)
@@ -91,8 +81,84 @@ class MainActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCameraIntent()
         }
-
     }
+
+    private fun createNotificationChannel() {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel("CHANNEL_ID", "name", NotificationManager.IMPORTANCE_HIGH)
+            val notificationManager: NotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun sendNotification() {
+        val builder = NotificationCompat.Builder(this, "CHANNEL_ID")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Wysyłam maila")
+            .setContentText("Nie zamykaj aplikacji")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setSilent(true)
+            .setProgress(100,50,true)
+
+        with(NotificationManagerCompat.from(this)) { notify(999, builder.build()) }
+    }
+
+    private fun cancelNotification() {
+        NotificationManagerCompat.from(this).cancel(999)
+    }
+
+    private fun showDialogPaymentMethod() {
+        val dialogPaymentMethod = Dialog(this)
+        dialogPaymentMethod.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialogPaymentMethod.setContentView(R.layout.payment_method)
+        val imageView = dialogPaymentMethod.findViewById(R.id.imageView) as ImageView
+        imageView.setImageURI(photoURI)
+        val radioGroup = dialogPaymentMethod.findViewById(R.id.radioGroup) as RadioGroup
+        val sendButton = dialogPaymentMethod.findViewById(R.id.button) as Button
+        sendButton.setOnClickListener {
+            radioButton = dialogPaymentMethod.findViewById(radioGroup.checkedRadioButtonId) as RadioButton
+            dialogPaymentMethod.dismiss()
+            sendMail()
+        }
+        dialogPaymentMethod.show()
+    }
+
+    private fun setPermission() {
+        val permission = arrayOf(
+            Manifest.permission.INTERNET,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA
+        )
+        if (!hasPermissions(this, *permission)) ActivityCompat.requestPermissions(this, permission, 1)
+    }
+
+    private fun hasPermissions(context: Context, vararg permissions: String): Boolean = permissions.all {
+        ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun setNameAndSurname() {
+        if(mailFrom != "") {
+            firstName = mailFrom.substringBefore(".")
+            lastName = mailFrom.substringAfter(".").substringBefore("@")
+        }
+    }
+
+    @SuppressLint("SimpleDateFormat")
+    private fun timeStamp(): String {
+        return SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+    }
+
+    private fun showProgressBars(){
+        progressBar = findViewById(R.id.progressBar)
+        progressBar.visibility = View.VISIBLE
+        sendNotification()
+    }
+
+    private fun hideProgressBars(){
+        progressBar.visibility = View.INVISIBLE
+        cancelNotification()
+    }
+
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         val inflater = menuInflater
         inflater.inflate(R.menu.menu, menu)
@@ -110,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    fun showDialogMailTo() {
+    private fun showDialogMailTo() {
         val dialogMailTo = Dialog(this)
         dialogMailTo.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialogMailTo.setCancelable(false)
@@ -120,92 +186,88 @@ class MainActivity : AppCompatActivity() {
         val okBtn = dialogMailTo.findViewById(R.id.okBtn) as Button
         okBtn.setOnClickListener {
             mailTo = phoneField.text.toString()
-            saveData(TEXTMailTo, mailTo)
+            saveData("MailTo", mailTo)
             dialogMailTo.dismiss()
-            val toast = Toast.makeText(applicationContext, "Saved", Toast.LENGTH_SHORT)
-            toast.setGravity(Gravity.BOTTOM,0,200)
-            toast.show()
+            makeToast("Saved")
         }
         dialogMailTo.show()
     }
 
-    fun saveData(value : String, string: String) {
-        val sharedPreferences = getSharedPreferences(SHARED_PREFS, Context.MODE_PRIVATE)
+    private fun makeToast(text: String) {
+        val toast = Toast.makeText(this@MainActivity, text, Toast.LENGTH_SHORT)
+        toast.setGravity(Gravity.BOTTOM,0,200)
+        toast.show()
+    }
+
+    private fun saveData(value : String, string: String) {
+        val sharedPreferences = getSharedPreferences("sharedPrefs", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
         editor.putString(value, string)
         editor.apply()
     }
 
-    fun loadData() {
-        val sharedPreferences = getSharedPreferences(SHARED_PREFS, Context.MODE_PRIVATE)
-        mailTo = sharedPreferences.getString(TEXTMailTo, "")!!
-        mailFromMailString = sharedPreferences.getString(TEXTMailFrom, "")!!
-        mailPassString = sharedPreferences.getString(TEXTMailPass, "")!!
+    private fun loadData() {
+        val sharedPreferences = getSharedPreferences("sharedPrefs", Context.MODE_PRIVATE)
+        mailTo = sharedPreferences.getString("MailTo", "")!!
+        mailFrom = sharedPreferences.getString("MailFrom", "")!!
+        mailPass = sharedPreferences.getString("MailFromPass", "")!!
     }
 
-    private fun startCameraIntent(){
+    private fun startCameraIntent() {
         val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         photoFile = createImageFile()
         if (photoFile != null) {
             photoURI = FileProvider.getUriForFile(this, "com.example.duoninvoicesender.fileprovider", photoFile!!)
             cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
-            startActivityForResult(cameraIntent, picId)
+            startForResult.launch(cameraIntent)
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, dane: Intent?
-    ) {
-        super.onActivityResult(requestCode, resultCode, dane)
-        if (requestCode == picId && resultCode == RESULT_OK) {
-            log.visibility = View.VISIBLE
-            val sendThread = Thread {
-                try {
-                    Transport.send(plainMail())
-                    this@MainActivity.runOnUiThread {
-                        log.visibility = View.INVISIBLE
-                        val toast = Toast.makeText(this@MainActivity, "Mail sent", Toast.LENGTH_SHORT)
-                        toast.setGravity(Gravity.BOTTOM, 0, 200)
-                        toast.show()
-                    }
-                }
-                catch(e: AuthenticationFailedException) {
-                    e.printStackTrace()
-                    this@MainActivity.runOnUiThread {
-                        log.visibility = View.INVISIBLE
-                        val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
-                        toast.setGravity(Gravity.BOTTOM,0,200)
-                        toast.show()
-                    }
-                }
-                catch(e: SendFailedException) {
-                    e.printStackTrace()
-                    this@MainActivity.runOnUiThread {
-                        log.visibility = View.INVISIBLE
-                        val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
-                        toast.setGravity(Gravity.BOTTOM, 0, 200)
-                        toast.show()
-                    }
-                }
-                catch(e: MessagingException) {
-                    e.printStackTrace()
-                    this@MainActivity.runOnUiThread {
-                        log.visibility = View.INVISIBLE
-                        val toast = Toast.makeText(this@MainActivity, "Something went wrong, check your account info", Toast.LENGTH_SHORT)
-                        toast.setGravity(Gravity.BOTTOM,0,200)
-                        toast.show()
-                    }
+    private val startForResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            showDialogPaymentMethod()
+        }
+    }
+
+    private fun sendMail() {
+        showProgressBars()
+        val sendThread = Thread {
+            try {
+                Transport.send(plainMail())
+                this@MainActivity.runOnUiThread {
+                    hideProgressBars()
+                    makeToast("Mail sent")
                 }
             }
-            sendThread.priority = 10
-            sendThread.start()
+            catch(e: AuthenticationFailedException) {
+                e.printStackTrace()
+                this@MainActivity.runOnUiThread {
+                    hideProgressBars()
+                    makeToast("Something went wrong, check your account info")
+                }
+            }
+            catch(e: SendFailedException) {
+                e.printStackTrace()
+                this@MainActivity.runOnUiThread {
+                    hideProgressBars()
+                    makeToast("Something went wrong, check your account info")
+                }
+            }
+            catch(e: MessagingException) {
+                e.printStackTrace()
+                this@MainActivity.runOnUiThread {
+                    hideProgressBars()
+                    makeToast("Something went wrong, check your account info")
+                }
+            }
         }
+        sendThread.priority = 10
+        sendThread.start()
     }
 
-    @SuppressLint("SimpleDateFormat")
     @Throws(IOException::class)
     private fun createImageFile(): File? {
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val imageFileName = firstLetterOfName.toString() + firstLetterOfSurname.toString() + "_FV_" + timeStamp + "_"
+        val imageFileName = "temp_"
         val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
         val image = File.createTempFile(
             imageFileName,  /* prefix */
@@ -213,44 +275,40 @@ class MainActivity : AppCompatActivity() {
             storageDir /* directory */
         )
         mCurrentPhotoPath = image.absolutePath
-        mCurrentPhotoName = image.name
         return image
     }
 
     private fun plainMail(): MimeMessage {
-            val tos = arrayListOf(mailTo) //Multiple recipients
-            val from = mailFromMailString //Sender email
-            val properties = System.getProperties()
-            with(properties) {
-                put("mail.smtp.host", "smtp.office365.com") //Configure smtp host
-                put("mail.smtp.port", "587") //Configure port
-                put("mail.smtp.starttls.enable", "true") //Enable TLS
-                put("mail.smtp.auth", "true") //Enable authentication
+        val tos = arrayListOf(mailTo) //Multiple recipients
+        val from = mailFrom //Sender email
+        val properties = System.getProperties()
+        with(properties) {
+            put("mail.smtp.host", "smtp.office365.com") //Configure smtp host
+            put("mail.smtp.port", "587") //Configure port
+            put("mail.smtp.starttls.enable", "true") //Enable TLS
+            put("mail.smtp.auth", "true") //Enable authentication
+        }
+        val auth = object : Authenticator() { override fun getPasswordAuthentication() = PasswordAuthentication(from, mailPass) } //Credentials of the sender email
+        val session = Session.getInstance(properties, auth)
+        val message = MimeMessage(session)
+        val multipart = MimeMultipart("related")
+        val messageBodyPart1 = MimeBodyPart()
+        val text = "W załączeniu skan faktury." + "<br>" + "<br>" + "Płatność: " + radioButton.text.toString() + "<br>" + "<br>" + "Pozdrawiam," + "<br>" + firstName?.get(0)?.uppercase() + firstName?.drop(1) + " " + lastName?.get(0)?.uppercase() + lastName?.drop(1)
+        messageBodyPart1.setContent(text, "text/html; charset=UTF-8")
+        multipart.addBodyPart(messageBodyPart1)
+        val messageBodyPart2 = MimeBodyPart()
+        val fds = FileDataSource(mCurrentPhotoPath)
+        messageBodyPart2.dataHandler = DataHandler(fds)
+        messageBodyPart2.fileName = lastName + firstName?.get(0) + "_FV_" + radioButton.text.toString().replace(" ", "_").replace("ż", "z").replace("ó", "o").replace("ł", "l").lowercase() + "_" + timeStamp() + ".jpg"
+        multipart.addBodyPart(messageBodyPart2)
+        with(message) {
+            setFrom(InternetAddress(from))
+            for (to in tos) {
+                addRecipient(Message.RecipientType.TO, InternetAddress(to))
+                subject = "Skan_Faktury" //Email subject
+                setContent(multipart)
             }
-            val auth = object : Authenticator() {
-                override fun getPasswordAuthentication() =
-                    PasswordAuthentication(from, mailPassString) //Credentials of the sender email
-            }
-            val session = Session.getInstance(properties, auth)
-            val message = MimeMessage(session)
-            val multipart = MimeMultipart("related")
-            val messageBodyPart1 = MimeBodyPart()
-            val Text = "W załączeniu skan faktury. - " + firstLetterOfName.toString() + firstLetterOfSurname.toString()
-            messageBodyPart1.setContent(Text, "text/html; charset=UTF-8")
-            multipart.addBodyPart(messageBodyPart1)
-            val messageBodyPart2 = MimeBodyPart()
-            val fds = FileDataSource(mCurrentPhotoPath)
-            messageBodyPart2.dataHandler = DataHandler(fds)
-            messageBodyPart2.fileName = mCurrentPhotoName
-            multipart.addBodyPart(messageBodyPart2)
-            with(message) {
-                setFrom(InternetAddress(from))
-                for (to in tos) {
-                    addRecipient(Message.RecipientType.TO, InternetAddress(to))
-                    subject = "Skan_Faktury" //Email subject
-                    setContent(multipart)
-                }
-            }
+        }
         return message
     }
 
@@ -258,14 +316,14 @@ class MainActivity : AppCompatActivity() {
         try {
             val properties = System.getProperties()
             with(properties) {
-                //put("mail.smtp.host", "mail.duon.biz") //Configure smtp host
+                //put("mail.smtp.host", "smtp.office365.com") //Configure smtp host
                 //put("mail.smtp.port", "587") //Configure port
-                //put("mail.smtp.starttls.enable", "false") //Enable TLS
+                //put("mail.smtp.starttls.enable", "true") //Enable TLS
                 put("mail.smtp.auth", "true") //Enable authentication
             }
             val session = Session.getInstance(properties, null)
             val transport = session.getTransport("smtp")
-            transport.connect("smtp.office365.com", 587, mailFromMailString, mailPassString)
+            transport.connect("smtp.office365.com", 587, mailFrom, mailPass)
             transport.close()
             this@MainActivity.runOnUiThread {
                 val toast = Toast.makeText(this@MainActivity, "Saved and mail test passed", Toast.LENGTH_SHORT)
@@ -280,7 +338,6 @@ class MainActivity : AppCompatActivity() {
                 toast.setGravity(Gravity.BOTTOM,0,200)
                 toast.show()
             }
-
         }
         catch(e: MessagingException) {
             e.printStackTrace()
@@ -290,10 +347,6 @@ class MainActivity : AppCompatActivity() {
                 toast.show()
             }
         }
-    }
-
-    private fun hasPermissions(context: Context, vararg permissions: String): Boolean = permissions.all {
-        ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
 
 }
