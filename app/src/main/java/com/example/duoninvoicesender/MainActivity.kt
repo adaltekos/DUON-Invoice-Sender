@@ -94,8 +94,8 @@ class MainActivity : AppCompatActivity() {
     private fun sendNotification() {
         val builder = NotificationCompat.Builder(this, "CHANNEL_ID")
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Wysyłam maila")
-            .setContentText("Nie zamykaj aplikacji")
+            .setContentTitle("Sending mail")
+            .setContentText("Do not kill the app process")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setSilent(true)
             .setProgress(100,50,true)
