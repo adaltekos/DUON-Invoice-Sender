@@ -1,4 +1,4 @@
-PL-lnag
+PL-lang
 
 # POTRZEBA
 Szybkie wysyłanie faktur zakupowych do sekretariatu który później wprowadza je do systemu OFK
